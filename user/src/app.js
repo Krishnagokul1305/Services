@@ -1,10 +1,6 @@
 const express = require("express");
 const dotenv = require("dotenv");
 
-dotenv.config({
-  path: "./.env",
-});
-
 dotenv.config({ path: "./config.env" });
 
 const morgan = require("morgan");
@@ -13,12 +9,11 @@ const userRoute = require("./route/user.route.js");
 const authRoute = require("./route/auth.route.js");
 const AppError = require("./utils/AppError.js");
 const { globalErrorHandler } = require("./utils/globalErrorHandler.js");
+const connectDB = require("./utils/database.js");
 
 const PORT = process.env.PORT || 8000;
 
 const app = express();
-
-// console.log(process.cwd());
 
 app.use(morgan("dev"));
 app.use(
@@ -41,5 +36,12 @@ app.use("/{*any}", (req, res, next) => {
 app.use(globalErrorHandler);
 
 app.listen(PORT, () => {
+  connectDB()
+    .then(() => {
+      console.log("Connected to MongoDB");
+    })
+    .catch((error) => {
+      console.error("Error connecting to MongoDB:", error);
+    });
   console.log(`Server is running on port ${PORT}`);
 });

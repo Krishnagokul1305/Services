@@ -1,7 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const prisma = require("../utils/prisma.js");
+const User = require("../models/user.model.js");
 const AppError = require("../utils/AppError.js");
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -10,15 +10,17 @@ const JWT_EXPIRY = "7d";
 const JWT_REFRESH_EXPIRY = "90d";
 
 const login = async (email, password) => {
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !(await bcrypt.compare(password, user.password))) {
+  // Find user and include password for comparison
+  const user = await User.findOne({ email }).select("+password");
+
+  if (!user || !(await user.comparePassword(password))) {
     throw AppError.unauthorized("Invalid credentials");
   }
 
   const tokenIssuedAt = Math.floor(Date.now() / 1000);
 
   const accessToken = jwt.sign(
-    { id: user.id, role: "user", iat: tokenIssuedAt },
+    { id: user._id, role: "user", iat: tokenIssuedAt },
     JWT_SECRET,
     {
       expiresIn: JWT_EXPIRY,
@@ -26,37 +28,36 @@ const login = async (email, password) => {
   );
 
   const refreshToken = jwt.sign(
-    { id: user.id, type: "refresh", iat: tokenIssuedAt },
+    { id: user._id, type: "refresh", iat: tokenIssuedAt },
     JWT_REFRESH_SECRET,
     {
       expiresIn: JWT_REFRESH_EXPIRY,
     }
   );
 
+  // Convert to plain object and remove sensitive fields
+  const userObject = user.toObject();
   const {
     password: _,
     resetToken,
     resetTokenExpiry,
     passwordUpdatedAt,
     ...safeUser
-  } = user;
+  } = userObject;
+
   return { user: safeUser, accessToken, refreshToken };
 };
 
 const forgotPassword = async (email) => {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await User.findOne({ email });
   if (!user) throw AppError.notFound("User not found");
 
   const token = crypto.randomBytes(32).toString("hex");
   const expiry = new Date(Date.now() + 1000 * 60 * 15);
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      resetToken: token,
-      resetTokenExpiry: expiry,
-    },
-  });
+  user.resetToken = token;
+  user.resetTokenExpiry = expiry;
+  await user.save();
 
   console.log(
     `Reset password link: https://yourapp/reset-password?token=${token}`
@@ -64,45 +65,28 @@ const forgotPassword = async (email) => {
 };
 
 const resetPassword = async (token, newPassword) => {
-  const user = await prisma.user.findFirst({
-    where: {
-      resetToken: token,
-      resetTokenExpiry: {
-        gte: new Date(),
-      },
-    },
+  const user = await User.findOne({
+    resetToken: token,
+    resetTokenExpiry: { $gte: new Date() },
   });
 
   if (!user) throw AppError.badRequest("Invalid or expired token");
 
-  const hashed = await bcrypt.hash(newPassword, 10);
+  // The password will be hashed automatically by the pre-save middleware
+  user.password = newPassword;
+  user.passwordUpdatedAt = new Date();
+  user.resetToken = null;
+  user.resetTokenExpiry = null;
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      password: hashed,
-      passwordUpdatedAt: new Date(),
-      resetToken: null,
-      resetTokenExpiry: null,
-    },
-  });
+  await user.save();
 };
 
 const getMe = async (decoded) => {
   await validateTokenAgainstPasswordUpdate(decoded);
 
-  return prisma.user.findUnique({
-    where: { id: decoded.id },
-    select: {
-      id: true,
-      username: true,
-      name: true,
-      email: true,
-      avatar: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
+  return User.findById(decoded.id).select(
+    "username name email avatar createdAt updatedAt"
+  );
 };
 
 const refreshToken = async (token) => {
@@ -113,9 +97,7 @@ const refreshToken = async (token) => {
       throw AppError.unauthorized("Invalid token type");
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-    });
+    const user = await User.findById(decoded.id);
 
     if (!user) {
       throw AppError.unauthorized("User not found");
@@ -133,7 +115,7 @@ const refreshToken = async (token) => {
     const newTokenIssuedAt = Math.floor(Date.now() / 1000);
 
     const newAccessToken = jwt.sign(
-      { id: user.id, role: "user", iat: newTokenIssuedAt },
+      { id: user._id, role: "user", iat: newTokenIssuedAt },
       JWT_SECRET,
       {
         expiresIn: JWT_EXPIRY,
@@ -141,7 +123,7 @@ const refreshToken = async (token) => {
     );
 
     const newRefreshToken = jwt.sign(
-      { id: user.id, type: "refresh", iat: newTokenIssuedAt },
+      { id: user._id, type: "refresh", iat: newTokenIssuedAt },
       JWT_REFRESH_SECRET,
       {
         expiresIn: JWT_REFRESH_EXPIRY,
@@ -165,13 +147,7 @@ const logout = async (userId) => {
 };
 
 const validateTokenAgainstPasswordUpdate = async (decoded) => {
-  const user = await prisma.user.findUnique({
-    where: { id: decoded.id },
-    select: {
-      id: true,
-      passwordUpdatedAt: true,
-    },
-  });
+  const user = await User.findById(decoded.id).select("passwordUpdatedAt");
 
   if (!user) {
     throw AppError.unauthorized("User not found");

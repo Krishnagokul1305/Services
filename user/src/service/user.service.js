@@ -1,132 +1,73 @@
 const bcrypt = require("bcryptjs");
-const prisma = require("../utils/prisma.js");
+const User = require("../models/user.model.js");
 const AppError = require("../utils/AppError.js");
 
 const createUser = async (data) => {
-  const hashedPassword = await bcrypt.hash(data.password, 10);
+  // Set default avatar if not provided
+  const userData = {
+    ...data,
+    avatar:
+      data.avatar ||
+      "https://s3-cdn-practise-bucket.s3.ap-south-1.amazonaws.com/uploads/default-profile.jpg",
+  };
 
-  return prisma.user.create({
-    data: {
-      ...data,
-      avatar:
-        "https://s3-cdn-practise-bucket.s3.ap-south-1.amazonaws.com/uploads/default-profile.jpg",
-      password: hashedPassword,
-    },
-    select: {
-      id: true,
-      username: true,
-      name: true,
-      email: true,
-      avatar: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
+  const user = new User(userData);
+  await user.save();
+
+  // Return user without sensitive fields (toJSON handles this automatically)
+  return user.toJSON();
 };
 
 const getUserById = async (id) => {
-  return prisma.user.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      username: true,
-      name: true,
-      email: true,
-      avatar: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
+  const user = await User.findById(id);
+  return user ? user.toJSON() : null;
 };
 
 const getAllUsers = async () => {
-  return prisma.user.findMany({
-    select: {
-      id: true,
-      username: true,
-      name: true,
-      email: true,
-      avatar: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
+  const users = await User.find({});
+  return users.map((user) => user.toJSON());
 };
 
 const updateUser = async (id, data) => {
   const { password, ...updatedData } = data;
 
-  return prisma.user.update({
-    where: { id },
-    data: updatedData,
-    select: {
-      id: true,
-      username: true,
-      name: true,
-      email: true,
-      avatar: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+  const user = await User.findByIdAndUpdate(id, updatedData, {
+    new: true,
+    runValidators: true,
   });
+
+  return user ? user.toJSON() : null;
 };
 
 const deleteUser = async (id) => {
-  return prisma.user.delete({
-    where: { id },
-  });
+  const user = await User.findByIdAndDelete(id);
+  return user ? user.toJSON() : null;
 };
 
 const findByUsernameOrEmail = async (identifier) => {
-  return prisma.user.findMany({
-    where: {
-      OR: [{ username: identifier }, { email: identifier }],
-    },
-    select: {
-      id: true,
-      username: true,
-      name: true,
-      email: true,
-      avatar: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+  const users = await User.find({
+    $or: [{ username: identifier }, { email: identifier }],
   });
+  return users.map((user) => user.toJSON());
 };
 
 const changePassword = async (id, currentPassword, newPassword) => {
   // First, get the user with password to verify current password
-  const user = await prisma.user.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      password: true,
-    },
-  });
+  const user = await User.findById(id);
 
   if (!user) {
     throw AppError.notFound("User not found");
   }
 
-  // Verify current password
-  const isCurrentPasswordValid = await bcrypt.compare(
-    currentPassword,
-    user.password
-  );
+  // Verify current password using the model method
+  const isCurrentPasswordValid = await user.comparePassword(currentPassword);
   if (!isCurrentPasswordValid) {
     throw AppError.badRequest("Current password is incorrect");
   }
 
-  // Hash new password
-  const hashedNewPassword = await bcrypt.hash(newPassword, 10);
-
-  await prisma.user.update({
-    where: { id },
-    data: {
-      password: hashedNewPassword,
-      passwordUpdatedAt: new Date(), // Update password timestamp
-    },
-  });
+  // Update password - middleware will handle hashing and passwordUpdatedAt
+  user.password = newPassword;
+  await user.save();
 
   return { message: "Password changed successfully" };
 };
