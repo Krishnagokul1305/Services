@@ -1,0 +1,25 @@
+{
+  "name": "microservices-load-testing",
+  "version": "1.0.0",
+  "description": "Load testing suite for microservices using autocannon",
+  "main": "loadTest.js",
+  "scripts": {
+    "test": "node examples.js",
+    "test:quick": "node -e \"require('./examples').quickPerformanceCheck()\"",
+    "test:stress": "node -e \"require('./examples').runStressTest()\"",
+    "test:all": "node -e \"require('./examples').testAllEndpoints()\"",
+    "test:user-service": "node examples.js",
+    "test:endpoint": "node runner.js"
+  },
+  "keywords": [
+    "load testing",
+    "autocannon",
+    "microservices",
+    "performance"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "autocannon": "^8.0.0"
+  }
+}
