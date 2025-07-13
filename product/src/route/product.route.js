@@ -28,7 +28,7 @@ router.get("/slug/:slug", getProductBySlugController);
 router.get("/sku/:sku", getProductBySkuController);
 router.get("/category/:categoryId", getProductsByCategoryController);
 router.get("/:id", getProductController);
-router.put("/:id", uploadFiles, updateProductController);
+router.patch("/:id", uploadFiles, updateProductController);
 router.delete("/:id", deleteProductController);
 
 // Product specific operations

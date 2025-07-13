@@ -11,23 +11,23 @@ const AppError = require("./utils/AppError.js");
 const { globalErrorHandler } = require("./utils/globalErrorHandler.js");
 const connectDB = require("./utils/database.js");
 
-const PORT = process.env.PORT || 8001;
+const PORT = process.env.PORT || 8003;
 
 const app = express();
 
 app.use(morgan("dev"));
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: ["http://localhost:5173", "http://localhost:8000"],
     credentials: true,
   })
 );
 
 app.use(express.json());
 
-app.use("/", userRoute);
+app.use("/api/v1/users", userRoute);
 
-app.use("/auth", authRoute);
+app.use("/api/v1/auth", authRoute);
 
 app.use("/{*any}", (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));

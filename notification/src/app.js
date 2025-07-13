@@ -4,11 +4,10 @@ require("dotenv").config({
   path: "./config.env",
 });
 
-const reviewRoutes = require("./route/review.route");
+const emailRoutes = require("./route/emailRoutes");
 const morgan = require("morgan");
 const globalErrorHandler = require("./utils/globalErrorHandler");
 const { ApiResponse } = require("./utils/ApiResponse");
-const connectDB = require("./utils/database");
 
 const app = express();
 
@@ -18,12 +17,14 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 app.get("/health", (req, res) => {
-  res.json(ApiResponse.success({ status: "OK", service: "Review Service" }));
+  res.json(ApiResponse.success({ status: "OK", service: "Notification Service" }));
 });
 
-app.use("/api/v1/reviews", reviewRoutes);
+// Routes
+app.use("/api/v1/email", emailRoutes);
 
-app.all("/{*any}", (req, res) => {
+// 404 handler
+app.all("*", (req, res) => {
   res
     .status(404)
     .json(ApiResponse.notFound(`Route ${req.originalUrl} not found`));
@@ -32,17 +33,13 @@ app.all("/{*any}", (req, res) => {
 // Global error handler
 app.use(globalErrorHandler);
 
-const PORT = process.env.PORT || 3003;
+const PORT = process.env.PORT || 8004;
 
 app.listen(PORT, () => {
-  connectDB()
-    .then(() => {
-      console.log("Connected to MongoDB");
-    })
-    .catch((error) => {
-      console.error("Error connecting to MongoDB:", error);
-    });
-  console.log(`Review service running on port ${PORT}`);
+  console.log(`Notification service running on port ${PORT}`);
+  console.log(`Email service endpoint: http://localhost:${PORT}/api/v1/email/sendemail`);
+  console.log(`Health check: http://localhost:${PORT}/health`);
+  console.log(`Email service check: http://localhost:${PORT}/api/v1/email/check`);
 });
 
 module.exports = app;

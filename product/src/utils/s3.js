@@ -18,20 +18,21 @@ const uploadAndGetUrls = async (files, folder = "products") => {
   try {
     const uploadPromises = files.map(async (file) => {
       const params = {
-        Bucket: process.env.AWS_S3_BUCKET,
+        Bucket: process.env.AWS_BUCKET_NAME,
         Key: `${folder}/${Date.now()}-${Math.round(Math.random() * 1e9)}-${
           file.originalname
         }`,
         Body: file.buffer,
         ContentType: file.mimetype,
-        ACL: "public-read",
       };
 
       const result = await s3.upload(params).promise();
+      console.log(result);
       return result.Location;
     });
 
     const urls = await Promise.all(uploadPromises);
+    console.log(urls);
     return urls;
   } catch (error) {
     throw new Error(`S3 upload failed: ${error.message}`);

@@ -18,15 +18,15 @@ const app = express();
 app.use(morgan("dev"));
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:3000"],
+    origin: ["http://localhost:3000"],
     credentials: true,
   })
 );
 
 app.use(express.json());
 
-app.use("/", productRoute);
-app.use("/api/categories", categoryRoute);
+app.use("/api/v1/products", productRoute);
+app.use("/api/v1/categories", categoryRoute);
 
 app.get("/health", (req, res) => {
   res.status(200).json({
