@@ -13,9 +13,6 @@ const connectDB = require("./utils/database.js");
 
 const PORT = process.env.PORT || 8001;
 
-// Connect to MongoDB
-connectDB();
-
 const app = express();
 
 app.use(morgan("dev"));
@@ -28,11 +25,9 @@ app.use(
 
 app.use(express.json());
 
-// API routes
-app.use("/api/v1/categories", categoryRoute);
-app.use("/api/v1/products", productRoute);
+app.use("/", productRoute);
+app.use("/api/categories", categoryRoute);
 
-// Health check route
 app.get("/health", (req, res) => {
   res.status(200).json({
     success: true,
@@ -43,15 +38,20 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Handle undefined routes
-// app.use("*", (req, res, next) => {
-//   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
-// });
+app.use("/{*any}", (req, res, next) => {
+  next(AppError.notFound(`Can't find ${req.originalUrl} on this server!`));
+});
 
-// Global error handler
 app.use(globalErrorHandler);
 
 app.listen(PORT, () => {
+  connectDB()
+    .then(() => {
+      console.log("Connected to MongoDB");
+    })
+    .catch((error) => {
+      console.error("Error connecting to MongoDB:", error);
+    });
   console.log(`🚀 Product service is running on port ${PORT}`);
 });
 
