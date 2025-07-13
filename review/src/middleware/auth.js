@@ -1,6 +1,9 @@
 const jwt = require("jsonwebtoken");
-const { AppError } = require("../utils/AppError");
 const { ApiResponse } = require("../utils/ApiResponse");
+const axios = require("axios");
+
+const USER_SERVICE_URL =
+  process.env.USER_SERVICE_URL || "http://localhost:8001";
 
 const authenticateToken = async (req, res, next) => {
   try {
@@ -14,7 +17,14 @@ const authenticateToken = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    const userResponse = await axios.get(
+      `${USER_SERVICE_URL}/api/users/${decoded.id}`
+    );
+    if (!userResponse.data.success) {
+      return res.status(404).json(ApiResponse.notFound("User not found"));
+    }
+    const userData = await userResponse?.data?.data[0];
+    req.user = userData;
     next();
   } catch (error) {
     if (error.name === "TokenExpiredError") {
@@ -26,24 +36,6 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-const optionalAuth = async (req, res, next) => {
-  try {
-    const authHeader = req.headers["authorization"];
-    const token = authHeader && authHeader.split(" ")[1];
-
-    if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = decoded;
-    }
-    next();
-  } catch (error) {
-    // If token is invalid, continue without user
-    req.user = null;
-    next();
-  }
-};
-
 module.exports = {
   authenticateToken,
-  optionalAuth,
 };

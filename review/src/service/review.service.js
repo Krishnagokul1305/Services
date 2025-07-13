@@ -9,7 +9,7 @@ const createReview = async (data) => {
     return review.toJSON();
   } catch (error) {
     if (error.code === 11000) {
-      throw new AppError("You have already reviewed this product", 409);
+      throw AppError.conflict("You have already reviewed this product");
     }
     throw error;
   }
@@ -116,12 +116,12 @@ const updateReview = async (id, data, userId) => {
   const review = await Review.findById(id);
 
   if (!review) {
-    throw new AppError("Review not found", 404);
+    throw new AppError.notFound("Review not found");
   }
 
   // Check if user owns this review
   if (review.user.toString() !== userId) {
-    throw new AppError("You can only update your own reviews", 403);
+    throw new AppError.forbidden("You can only update your own reviews");
   }
 
   // Don't allow changing product, user, or status
@@ -147,12 +147,12 @@ const deleteReview = async (id, userId) => {
   const review = await Review.findById(id);
 
   if (!review) {
-    throw new AppError("Review not found", 404);
+    throw new AppError.notFound("Review not found");
   }
 
   // Check if user owns this review
   if (review.user.toString() !== userId) {
-    throw new AppError("You can only delete your own reviews", 403);
+    throw new AppError.forbidden("You can only delete your own reviews");
   }
 
   await Review.findByIdAndDelete(id);
@@ -164,19 +164,18 @@ const markReviewHelpful = async (id) => {
   const review = await Review.findById(id);
 
   if (!review) {
-    throw new AppError("Review not found", 404);
+    throw new AppError.notFound("Review not found");
   }
 
   await review.markHelpful();
   return review.toJSON();
 };
 
-// Admin: Update review status
 const updateReviewStatus = async (id, status) => {
   const validStatuses = ["pending", "approved", "rejected"];
 
   if (!validStatuses.includes(status)) {
-    throw new AppError("Invalid status", 400);
+    throw new AppError.badRequest("Invalid status");
   }
 
   const review = await Review.findByIdAndUpdate(
@@ -186,13 +185,47 @@ const updateReviewStatus = async (id, status) => {
   );
 
   if (!review) {
-    throw new AppError("Review not found", 404);
+    throw new AppError.notFound("Review not found");
   }
 
   return review.toJSON();
 };
 
 // Get review statistics
+const getProductReviewStats = async () => {
+  const stats = await Review.aggregate([
+    {
+      $group: {
+        _id: "$productId", // Group by product
+        totalReviews: { $sum: 1 },
+        averageRating: { $avg: "$rating" },
+        pendingReviews: {
+          $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] },
+        },
+        approvedReviews: {
+          $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] },
+        },
+        rejectedReviews: {
+          $sum: { $cond: [{ $eq: ["$status", "rejected"] }, 1, 0] },
+        },
+      },
+    },
+    {
+      $project: {
+        productId: "$_id",
+        _id: 0,
+        totalReviews: 1,
+        averageRating: 1,
+        pendingReviews: 1,
+        approvedReviews: 1,
+        rejectedReviews: 1,
+      },
+    },
+  ]);
+
+  return stats;
+};
+
 const getReviewStats = async () => {
   const stats = await Review.aggregate([
     {
@@ -232,6 +265,7 @@ module.exports = {
   getReviewsByUser,
   getProductRatingStats,
   updateReview,
+  getProductReviewStats,
   deleteReview,
   markReviewHelpful,
   updateReviewStatus,

@@ -1,31 +1,30 @@
 const express = require("express");
-const { reviewController } = require("../controller/review.controller");
-const { authenticateToken, optionalAuth } = require("../middleware/auth");
-const { uploadFiles, uploadAndGetUrls } = require("../middleware/multer");
+const reviewController = require("../controller/review.controller");
+const { authenticateToken } = require("../middleware/auth");
 
 const router = express.Router();
-
-// Public routes (with optional auth for user-specific data)
+router.get("/", reviewController.getAllReviewsController);
+router.get("/product/:productId", reviewController.getProductReviewsController);
+router.get("/user/:userId", reviewController.getUserReviewsController);
+router.get("/overall-stats", reviewController.getReviewStatsController);
 router.get(
-  "/product/:productId",
-  optionalAuth,
-  reviewController.getProductReviews
+  "/product-stats/:productId",
+  reviewController.getProductReviewStatsController
 );
-router.get("/user/:userId", optionalAuth, reviewController.getUserReviews);
-router.get("/:id", optionalAuth, reviewController.getReviewById);
+router.get("/:id", reviewController.getReviewController);
 
 router.use(authenticateToken);
-
-router.post("/", uploadFiles, uploadAndGetUrls, reviewController.createReview);
-router.put(
+router.post("/", authenticateToken, reviewController.createReviewController);
+router.put("/:id", authenticateToken, reviewController.updateReviewController);
+router.delete(
   "/:id",
-  uploadFiles,
-  uploadAndGetUrls,
-  reviewController.updateReview
+  authenticateToken,
+  reviewController.deleteReviewController
 );
-router.delete("/:id", reviewController.deleteReview);
-router.patch("/:id/helpful", reviewController.markHelpful);
-router.patch("/:id/unhelpful", reviewController.markUnhelpful);
-router.patch("/:id/status", reviewController.updateStatus);
+router.patch(
+  "/:id/status",
+  authenticateToken,
+  reviewController.updateReviewStatusController
+);
 
 module.exports = router;

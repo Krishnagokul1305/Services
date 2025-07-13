@@ -11,7 +11,7 @@ const AppError = require("./utils/AppError.js");
 const { globalErrorHandler } = require("./utils/globalErrorHandler.js");
 const connectDB = require("./utils/database.js");
 
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 8001;
 
 const app = express();
 
@@ -25,9 +25,9 @@ app.use(
 
 app.use(express.json());
 
-app.use("/api/v1/users", userRoute);
+app.use("/", userRoute);
 
-app.use("/api/v1/auth", authRoute);
+app.use("/auth", authRoute);
 
 app.use("/{*any}", (req, res, next) => {
   next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));

@@ -13,27 +13,15 @@ const {
 } = require("../service/review.service.js");
 
 const { ApiResponse } = require("../utils/ApiResponse.js");
-const { uploadAndGetUrls } = require("../utils/s3.js");
 
 // Create a new review
 const createReviewController = async (req, res, next) => {
   try {
-    const {
-      product,
-      rating,
-      title,
-      comment,
-      verified,
-      userName,
-      userEmail,
-      productName,
-      productSku,
-    } = req.body;
+    const { product, rating, comment, verified } = req.body;
 
-    // Get user ID from request (assuming auth middleware sets req.user)
-    const user = req.user?.id || req.body.user;
+    const user = req.user?._id || req.body.user;
 
-    if (!product || !user || !rating || !title || !comment) {
+    if (!product || !user || !rating || !comment) {
       return res
         .status(400)
         .json(
@@ -43,30 +31,12 @@ const createReviewController = async (req, res, next) => {
         );
     }
 
-    if (!userName || !userEmail || !productName || !productSku) {
-      return res
-        .status(400)
-        .json(ApiResponse.error("User and product information are required"));
-    }
-
-    // Upload images if provided
-    let imageUrls = [];
-    if (req.files && req.files.length > 0) {
-      imageUrls = await uploadAndGetUrls(req.files, "reviews");
-    }
-
     const reviewData = {
       product,
       user,
       rating,
-      title,
       comment,
       verified: verified || false,
-      images: imageUrls,
-      userName,
-      userEmail,
-      productName,
-      productSku,
     };
 
     const review = await createReview(reviewData);
@@ -79,7 +49,6 @@ const createReviewController = async (req, res, next) => {
   }
 };
 
-// Get all reviews
 const getAllReviewsController = async (req, res, next) => {
   try {
     const { product, user, rating, status, verified, page, limit, sort } =
@@ -220,24 +189,12 @@ const updateReviewController = async (req, res, next) => {
     const { id } = req.params;
     const updateData = { ...req.body };
 
-    // Get user ID from request (assuming auth middleware)
     const userId = req.user?.id || req.body.userId;
 
     if (!userId) {
       return res
         .status(401)
         .json(ApiResponse.error("User authentication required"));
-    }
-
-    // Upload new images if provided
-    if (req.files && req.files.length > 0) {
-      const newImageUrls = await uploadAndGetUrls(req.files, "reviews");
-
-      if (updateData.images && Array.isArray(updateData.images)) {
-        updateData.images = [...updateData.images, ...newImageUrls];
-      } else {
-        updateData.images = newImageUrls;
-      }
     }
 
     const review = await updateReview(id, updateData, userId);
@@ -255,8 +212,9 @@ const deleteReviewController = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // Get user ID from request (assuming auth middleware)
-    const userId = req.user?.id || req.body.userId;
+    console.log(req.user);
+
+    const userId = req.user?._id;
 
     if (!userId) {
       return res
@@ -322,9 +280,29 @@ const getReviewStatsController = async (req, res, next) => {
   }
 };
 
+const getProductReviewStatsController = async (req, res, next) => {
+  try {
+    const { productId } = req.params;
+    if (!productId) {
+      return res.status(400).json(ApiResponse.error("Product ID is required"));
+    }
+
+    const stats = await getReviewStats();
+
+    res
+      .status(200)
+      .json(
+        ApiResponse.success(stats, "Review statistics retrieved successfully")
+      );
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createReviewController,
   getAllReviewsController,
+  getProductReviewStatsController,
   getReviewController,
   getProductReviewsController,
   getUserReviewsController,

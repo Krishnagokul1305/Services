@@ -26,11 +26,11 @@ const reviewSchema = new mongoose.Schema(
     },
     verified: {
       type: Boolean,
-      default: false, // Set to true if user actually purchased the product
+      default: false,
     },
     images: [
       {
-        type: String, // URLs of review images
+        type: String,
       },
     ],
   },
@@ -45,16 +45,11 @@ const reviewSchema = new mongoose.Schema(
   }
 );
 
-// Compound index to ensure one review per user per product
 reviewSchema.index({ product: 1, user: 1 }, { unique: true });
 
-// Indexes for performance
-reviewSchema.index({ product: 1 });
-reviewSchema.index({ user: 1 });
 reviewSchema.index({ rating: 1 });
 reviewSchema.index({ createdAt: -1 });
 
-// Static method to get average rating for a product
 reviewSchema.statics.getProductRatingStats = async function (productId) {
   const stats = await this.aggregate([
     {
